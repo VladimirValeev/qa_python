@@ -7,80 +7,96 @@ def collector():
     return BooksCollector()
 
 
-# 1) add_new_book - позитивный сценарий
+# 1) add_new_book - книга добавляется
 def test_add_new_book_adds_book(collector):
     collector.add_new_book('Три товарища')
-    assert 'Три товарища' in collector.get_books_genre()
+    assert 'Три товарища' in collector.books_genre
 
 
 # 2) add_new_book - некорректные имена не добавляются
 @pytest.mark.parametrize('bad_name', ['', 'A' * 41])
 def test_add_new_book_rejects_invalid_names(collector, bad_name):
     collector.add_new_book(bad_name)
-    assert bad_name not in collector.get_books_genre()
+    assert bad_name not in collector.books_genre
 
 
-# 3) add_new_book - дубли не создаются
+# 3) add_new_book - дубль игнорируется
 def test_add_new_book_duplicate_is_ignored(collector):
     collector.add_new_book('Мастер и Маргарита')
     collector.add_new_book('Мастер и Маргарита')
-    assert list(collector.get_books_genre().keys()).count('Мастер и Маргарита') == 1
+    assert len(collector.books_genre) == 1
 
 
-# 4) add_new_book - у добавленной книги жанр пустой
-def test_added_book_has_no_genre_initially(collector):
-    collector.add_new_book('Пикник на обочине')
-    assert collector.get_book_genre('Пикник на обочине') == ''
-
-
-# 5) set_book_genre - валидный жанр устанавливается
+# 4) set_book_genre - валидный жанр устанавливается
 def test_set_book_genre_valid(collector):
-    collector.add_new_book('Дюна')
+    collector.books_genre['Дюна'] = ''
     collector.set_book_genre('Дюна', 'Фантастика')
+    assert collector.books_genre['Дюна'] == 'Фантастика'
+
+
+# 5) set_book_genre - невалидный жанр игнорируется
+def test_set_book_genre_invalid_ignored(collector):
+    collector.books_genre['Собачье сердце'] = ''
+    collector.set_book_genre('Собачье сердце', 'Поэзия')
+    assert collector.books_genre['Собачье сердце'] == ''
+
+
+# 6) get_book_genre - возвращает жанр
+def test_get_book_genre_returns_value(collector):
+    collector.books_genre = {'Дюна': 'Фантастика'}
     assert collector.get_book_genre('Дюна') == 'Фантастика'
 
 
-# 6) set_book_genre - невалидный жанр игнорируется
-def test_set_book_genre_invalid_ignored(collector):
-    collector.add_new_book('Собачье сердце')
-    collector.set_book_genre('Собачье сердце', 'Поэзия')  # такого жанра нет в списке genre
-    assert collector.get_book_genre('Собачье сердце') == ''
+# 7) get_book_genre - возвращает None для неизвестной книги
+def test_get_book_genre_returns_none_for_unknown(collector):
+    assert collector.get_book_genre('Неизвестная книга') is None
 
 
-# 7) get_books_with_specific_genre - возвращает корректный список
+# 8) get_books_with_specific_genre - возвращает нужные книги
 def test_get_books_with_specific_genre_returns_expected(collector):
-    collector.add_new_book('Оно')
-    collector.add_new_book('Незнайка')
-    collector.set_book_genre('Оно', 'Ужасы')
-    collector.set_book_genre('Незнайка', 'Мультфильмы')
-
+    collector.books_genre = {'Оно': 'Ужасы', 'Незнайка': 'Мультфильмы'}
     assert collector.get_books_with_specific_genre('Ужасы') == ['Оно']
 
 
-# 8) get_books_for_children - книги с возрастным рейтингом исключаются
-def test_get_books_for_children_filters_age_rating(collector):
-    collector.add_new_book('Оно')
-    collector.add_new_book('Иван Васильевич меняет профессию')
-    collector.set_book_genre('Оно', 'Ужасы')  # есть возрастной рейтинг
-    collector.set_book_genre('Иван Васильевич меняет профессию', 'Комедии')  # для детей ок
+# 9) get_books_genre - возвращает текущий словарь
+def test_get_books_genre_returns_mapping(collector):
+    collector.books_genre = {'Оно': 'Ужасы', 'Незнайка': 'Мультфильмы'}
+    assert collector.get_books_genre() == {'Оно': 'Ужасы', 'Незнайка': 'Мультфильмы'}
 
+
+# 10) get_books_for_children - исключает возрастные жанры
+def test_get_books_for_children_filters_age_rating(collector):
+    collector.books_genre = {
+        'Оно': 'Ужасы',
+        'Иван Васильевич меняет профессию': 'Комедии',
+    }
     assert collector.get_books_for_children() == ['Иван Васильевич меняет профессию']
 
 
-# 9) add_book_in_favorites - добавляет только если книга есть в словаре и без дублей
-def test_add_book_in_favorites_only_existing_and_no_duplicates(collector):
-    collector.add_new_book('Дюна')
+# 11) add_book_in_favorites - добавляет существующую книгу
+def test_add_book_in_favorites_adds_existing(collector):
+    collector.books_genre = {'Дюна': 'Фантастика'}
     collector.add_book_in_favorites('Дюна')
-    collector.add_book_in_favorites('Дюна')  # повторно
-    collector.add_book_in_favorites('Несуществующая')  # нет в словаре - игнор
-
-    assert collector.get_list_of_favorites_books() == ['Дюна']
+    assert collector.favorites == ['Дюна']
 
 
-# 10) delete_book_from_favorites + get_list_of_favorites_books - удаление работает
-def test_delete_book_from_favorites_updates_list(collector):
-    collector.add_new_book('Трудно быть богом')
-    collector.add_book_in_favorites('Трудно быть богом')
-    collector.delete_book_from_favorites('Трудно быть богом')
+# 12) add_book_in_favorites - не добавляет дубликаты
+def test_add_book_in_favorites_no_duplicates(collector):
+    collector.books_genre = {'Три товарища': ''}
+    collector.favorites = ['Три товарища']
+    collector.add_book_in_favorites('Три товарища')
+    assert collector.favorites == ['Три товарища']
 
-    assert collector.get_list_of_favorites_books() == []
+
+# 13) delete_book_from_favorites - удаляет книгу
+def test_delete_book_from_favorites_removes_book(collector):
+    collector.favorites = ['Дюна']
+    collector.delete_book_from_favorites('Дюна')
+    assert collector.favorites == []
+
+
+# 14) get_list_of_favorites_books - возвращает список избранных
+def test_get_list_of_favorites_books_returns_all(collector):
+    collector.favorites = ['Три товарища', 'Дюна']
+    assert collector.get_list_of_favorites_books() == ['Три товарища', 'Дюна']
+                                                                                                                        
